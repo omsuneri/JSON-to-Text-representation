@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON to Text Converter</title>
+<style>
+    * {
+        box-sizing: border-box;
+    }
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        color: #f0f0f0;
+        line-height: 1.6;
+        background-color: #1a1a1a;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+    }
+    h1 {
+        color: #7f5af0;
+        text-align: center;
+        margin-bottom: 30px;
+    }
+    .container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        flex: 1;
+    }
+    textarea {
+        width: 100%;
+        min-height: 200px;
+        padding: 10px;
+        border: 1px solid #3a3a3a;
+        border-radius: 6px;
+        font-family: monospace;
+        resize: vertical;
+        background-color: #2d2d2d;
+        color: #f0f0f0;
+        transition: border 0.3s ease;
+    }
+    textarea:focus {
+        outline: none;
+        border-color: #7f5af0;
+    }
+    button {
+        background-color: #7f5af0;
+        color: white;
+        border: none;
+        padding: 12px 20px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 16px;
+        transition: all 0.3s;
+        font-weight: 500;
+    }
+    button:hover {
+        background-color: #6c4bd2;
+        transform: translateY(-1px);
+    }
+    button:active {
+        transform: translateY(0);
+    }
+    .output-container {
+        border: 1px solid #3a3a3a;
+        border-radius: 6px;
+        padding: 15px;
+        min-height: 200px;
+        background-color: #2d2d2d;
+        white-space: pre-wrap;
+        font-family: monospace;
+        color: #f0f0f0;
+    }
+    .label {
+        font-weight: bold;
+        margin-bottom: 8px;
+        color: #7f5af0;
+        font-size: 0.95rem;
+    }
+    .button-group {
+        display: flex;
+        gap: 12px;
+        margin-top: 15px;
+    }
+    #copyBtn {
+        background-color: #2cb67d;
+    }
+    #copyBtn:hover {
+        background-color: #239463;
+    }
+    #clearBtn {
+        background-color: #ef476f;
+    }
+    #clearBtn:hover {
+        background-color: #d43d63;
+    }
+    footer {
+        margin-top: 40px;
+        text-align: center;
+        padding: 20px 0;
+        color: #888;
+        font-size: 0.9rem;
+        border-top: 1px solid #3a3a3a;
+    }
+    footer a {
+        color: #7f5af0;
+        text-decoration: none;
+        transition: color 0.3s;
+    }
+    footer a:hover {
+        color: #6c4bd2;
+        text-decoration: underline;
+    }
+</style>
+</head>
+<body>
+    <h1>Convert JSON to Text Representation</h1>
+    <div class="container">
+        <div>
+            <div class="label">Paste your JSON code here:</div>
+            <textarea id="jsonInput" placeholder='Paste your project JSON here...'></textarea>
+        </div>
+        <div class="button-group">
+            <button id="convertBtn">Convert to Text Representation</button>
+            <button id="clearBtn">Clear Input</button>
+        </div>
+        <div>
+            <div class="label">Output:</div>
+            <div id="output" class="output-container">The text representation will appear here...</div>
+            <div class="button-group">
+                <button id="copyBtn">Copy Output</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('convertBtn').addEventListener('click', function() {
+            const jsonInput = document.getElementById('jsonInput').value;
+            const outputDiv = document.getElementById('output');
+            
+            try {
+                const data = JSON.parse(jsonInput);
+                const textRepresentation = convertMusicBlocks(data);
+                outputDiv.textContent = textRepresentation;
+            } catch (error) {
+                outputDiv.textContent = 'Error: ' + error.message;
+            }
+        });
+
+        document.getElementById('copyBtn').addEventListener('click', function() {
+            const outputDiv = document.getElementById('output');
+            const textToCopy = outputDiv.textContent;
+            
+            navigator.clipboard.writeText(textToCopy).then(function() {
+                // Change button text temporarily to show success
+                const copyBtn = document.getElementById('copyBtn');
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = 'Copied!';
+                copyBtn.style.backgroundColor = '#27ae60';
+                
+                setTimeout(function() {
+                    copyBtn.textContent = originalText;
+                    copyBtn.style.backgroundColor = '#27ae60';
+                }, 2000);
+            }).catch(function(err) {
+                console.error('Could not copy text: ', err);
+                alert('Failed to copy text. Please try again.');
+            });
+        });
+
+        document.getElementById('clearBtn').addEventListener('click', function() {
+            document.getElementById('jsonInput').value = '';
+        });
+
+        function convertMusicBlocks(data) {
+            if (!Array.isArray(data)) {
+                return "Invalid JSON format: Expected a list at the root.";
+            }
+
+            if (data.length === 0) {
+                return "Warning: No blocks found in input!";
+            }
+
+            const outputLines = ["Start of Project"];
+            const blockMap = Object.fromEntries(data.map(block => [block[0], block]));
+            const visited = new Set();
+            
+            const rootBlock = data.find(block => {
+                const blockType = Array.isArray(block[1]) ? block[1][0] : block[1];
+                return blockType === "start";
+            }) || data[0];
+
+            outputLines.push(...processBlock(rootBlock, blockMap, visited, 1));
+
+            for (const block of data) {
+                const blockId = block[0];
+                if (!visited.has(blockId)) {
+                    const blockType = Array.isArray(block[1]) ? block[1][0] : block[1];
+                    if (blockType !== "hidden" && blockType !== "vspace" && blockId !== rootBlock[0]) {
+                        outputLines.push(...processBlock(block, blockMap, visited, 1));
+                    }
+                }
+            }
+
+            return outputLines.join('\n');
+        }
+
+        function processBlock(block, blockMap, visited, indent = 1, isClamp = false, parentBlockType = null) {
+            const output = [];
+            const blockId = block[0];
+
+            if (visited.has(blockId)) {
+                return output;
+            }
+
+            visited.add(blockId);
+
+            let blockType = block[1];
+            let blockArgs = null;
+            if (Array.isArray(blockType)) {
+                blockArgs = blockType[1];
+                blockType = blockType[0];
+            }
+
+            if (["vspace", "hidden"].includes(blockType)) {
+                const connections = Array.isArray(block[block.length - 1]) ? block[block.length - 1] : [];
+                for (const childId of connections) {
+                    if (blockMap[childId]) {
+                        output.push(...processBlock(blockMap[childId], blockMap, visited, indent, isClamp, blockType));
+                    }
+                }
+                return output;
+            }
+
+            // Skip number and drumname blocks (they're shown in parent blocks)
+            if (blockType === "number" || blockType === "drumname" || blockType === "solfege") {
+                return output;
+            }
+
+            const blockRepresentation = getBlockRepresentation(blockType, blockArgs, block, blockMap, indent, isClamp, parentBlockType);
+            if (!blockRepresentation) {
+                return output;
+            }
+
+            const prefix = "│   ".repeat(indent - 1) + "├── ";
+            output.push(`${prefix}${blockRepresentation}`);
+
+            const connections = Array.isArray(block[block.length - 1]) ? block[block.length - 1] : [];
+
+            // Process clamp connections (nested)
+            for (let i = 0; i < connections.length - 1; i++) {
+                const childId = connections[i];
+                if (childId !== null && blockMap[childId]) {
+                    // Skip divider blocks that are already shown in parent blocks
+                    const childBlockType = Array.isArray(blockMap[childId][1]) ? blockMap[childId][1][0] : blockMap[childId][1];
+                    if (!(childBlockType === "divide" && 
+                         (parentBlockType === "newnote" || parentBlockType === "setmasterbpm2" || parentBlockType === "arc"))) {
+                        output.push(...processBlock(blockMap[childId], blockMap, visited, indent + 1, true, blockType));
+                    }
+                }
+            }
+
+            // Process stack connections (sequential)
+            if (connections.length > 0 && connections[connections.length - 1] !== null) {
+                const childId = connections[connections.length - 1];
+                if (blockMap[childId]) {
+                    output.push(...processBlock(blockMap[childId], blockMap, visited, indent, false, blockType));
+                }
+            }
+
+            if (blockType === "start" || blockType === "action") {
+                output.push("│   ".repeat(indent - 1) + "│");
+            }
+
+            return output;
+        }
+
+        function getBlockRepresentation(blockType, blockArgs, block, blockMap, indent, isClamp, parentBlockType) {
+            const connections = block[block.length - 1] || [];
+            
+            switch (blockType) {
+                case "start":
+                    const turtleInfo = [
+                        `ID: ${blockArgs.id}`,
+                        `Position: (${blockArgs.xcor.toFixed(2)}, ${blockArgs.ycor.toFixed(2)})`,
+                        `Heading: ${blockArgs.heading}°`,
+                        `Color: ${blockArgs.color}, Shade: ${blockArgs.shade}`,
+                        `Pen Size: ${blockArgs.pensize}, Grey: ${blockArgs.grey.toFixed(2)}`
+                    ].join(", ");
+                    return `Start Block --> {${turtleInfo}}`;
+                    
+                case "setmasterbpm2":
+                    const bpmValue = getNumericValue(connections[1], blockMap);
+                    let bpmOutput = `Set Master BPM → ${bpmValue || "?"} BPM`;
+                    
+                    // Check for divider block connected to setmasterbpm2
+                    if (connections[2] && blockMap[connections[2]] && blockMap[connections[2]][1] === "divide") {
+                        const divideBlock = blockMap[connections[2]];
+                        const numerator = getNumericValue(divideBlock[divideBlock.length - 1][1], blockMap);
+                        const denominator = getNumericValue(divideBlock[divideBlock.length - 1][2], blockMap);
+                        if (numerator !== null && denominator !== null && denominator !== 0) {
+                            bpmOutput += `\n${"│   ".repeat(indent)}├── beat value --> ${numerator}/${denominator} = ${(numerator / denominator).toFixed(2)}`;
+                        }
+                    }
+                    return bpmOutput;
+                    
+                case "divide":
+                    const numerator = getNumericValue(connections[1], blockMap);
+                    const denominator = getNumericValue(connections[2], blockMap);
+                    let result = "?";
+                    if (numerator !== null && denominator !== null && denominator !== 0) {
+                        result = (numerator / denominator).toFixed(2);
+                    }
+                    
+                    if (parentBlockType === "newnote") {
+                        return `Duration --> ${numerator || "?"}/${denominator || "?"} = ${result}`;
+                    } 
+                    return `Divide Block --> ${numerator || "?"}/${denominator || "?"} = ${result}`;
+                           
+                case "storein2":
+                    const varName = blockArgs?.value || "unnamed";
+                    const varValue = getNumericValue(connections[1], blockMap);
+                    return `Store Variable "${varName}" → ${varValue !== null ? varValue : "?"}`;
+                    
+                case "namedbox":
+                    return `Variable: "${blockArgs?.value || "unnamed"}"`;
+                    
+                case "action":
+                    const actionName = getTextValue(connections[1], blockMap);
+                    return `Action: "${actionName || "unnamed"}"`;
+                    
+                case "repeat":
+                    let repeatCount = "?";
+                    let repeatText = "?";
+                    
+                    if (connections[1] && blockMap[connections[1]]) {
+                        const countBlock = blockMap[connections[1]];
+                        if (Array.isArray(countBlock[1]) && countBlock[1][0] === "divide") {
+                            const num = getNumericValue(countBlock[countBlock.length - 1][1], blockMap);
+                            const den = getNumericValue(countBlock[countBlock.length - 1][2], blockMap);
+                            if (num !== null && den !== null && den !== 0) {
+                                repeatCount = (num / den).toFixed(2);
+                                repeatText = `${num}/${den} = ${repeatCount}`;
+                            }
+                        } else {
+                            repeatCount = getNumericValue(connections[1], blockMap);
+                            repeatText = repeatCount || "?";
+                        }
+                    }
+                    return `Repeat (${repeatText}) Times`;
+                    
+                case "forever":
+                    return "Forever Loop (Repeats Indefinitely)";
+                    
+                case "penup":
+                    return "Pen Up (Lifts Pen from Canvas)";
+                    
+                case "pendown":
+                    return "Pen Down";
+                    
+                case "forward":
+                    const forwardDist = getNumericValue(connections[1], blockMap);
+                    return `Move Forward → ${forwardDist || "?"} Steps`;
+                    
+                case "back":
+                    const backDist = getNumericValue(connections[1], blockMap);
+                    return `Move Backward → ${backDist || "?"} Steps`;
+                    
+                case "right":
+                    const rightAngle = getNumericValue(connections[1], blockMap);
+                    return `Rotate Right → ${rightAngle || "?"}°`;
+                    
+                case "left":
+                    const leftAngle = getNumericValue(connections[1], blockMap);
+                    return `Rotate Left → ${leftAngle || "?"}°`;
+                    
+                case "setheading":
+                    const heading = getNumericValue(connections[1], blockMap);
+                    return `Set Heading → ${heading || "0"}°`;
+                    
+                case "show":
+                    const showValue = getNumericValue(connections[2], blockMap);
+                    return `Show Number: ${showValue || "?"}`;
+                    
+                case "increment":
+                    const incColor = getNumericValue(connections[1], blockMap);
+                    const incAmount = getNumericValue(connections[2], blockMap);
+                    return `Increment --> Color: ${incColor || "?"}, Amount: ${incAmount || "?"}`;
+                    
+                case "incrementOne":
+                    const incOneVar = getNamedBoxValue(connections[1], blockMap);
+                    return `Increment Variable: "${incOneVar || "?"}"`;
+                    
+                case "newnote":
+                    return "Note";
+                    
+                case "playdrum":
+                    const drumName = getDrumName(connections[1], blockMap);
+                    return `Play Drum → ${drumName || "?"}`;
+                    
+                case "arc":
+                    let angle = "?";
+                    // Check if angle is connected to a divider block
+                    if (connections[3] && blockMap[connections[3]]) {
+                        const angleBlock = blockMap[connections[3]];
+                        if (Array.isArray(angleBlock[1]) && angleBlock[1][0] === "divide") {
+                            const num = getNumericValue(angleBlock[angleBlock.length - 1][1], blockMap);
+                            const den = getNumericValue(angleBlock[angleBlock.length - 1][2], blockMap);
+                            if (num !== null && den !== null && den !== 0) {
+                                angle = (num / den).toFixed(2);
+                            }
+                        } else {
+                            angle = getNumericValue(connections[3], blockMap) || "?";
+                        }
+                    }
+                    const radius = getNumericValue(connections[2], blockMap);
+                    return `Draw Arc --> Angle: ${angle}°, Radius: ${radius || "?"}`;
+                    
+                case "print":
+                    const printText = getTextValue(connections[2], blockMap);
+                    return `Print: "${printText || ""}"`;
+                    
+                case "plus":
+                    const add1 = getNumericValue(connections[1], blockMap);
+                    const add2 = getNumericValue(connections[2], blockMap);
+                    return `Add --> ${add1 || "?"} + ${add2 || "?"} = ${add1 !== null && add2 !== null ? (add1 + add2).toFixed(2) : "?"}`;
+                    
+                case "text":
+                    return `"${blockArgs?.value || ""}"`;
+                    
+                case "pitch":
+                    let solfege = "?";
+                    let octave = getNumericValue(connections[2], blockMap);
+                    
+                    // Handle solfege connection
+                    if (connections[1] && blockMap[connections[1]]) {
+                        const solfegeBlock = blockMap[connections[1]];
+                        const solfegeBlockType = Array.isArray(solfegeBlock[1]) ? solfegeBlock[1][0] : solfegeBlock[1];
+                        
+                        if (solfegeBlockType === "text" && Array.isArray(solfegeBlock[1])) {
+                            solfege = solfegeBlock[1][1]?.value || "?";
+                        } else if (solfegeBlockType === "solfege" && Array.isArray(solfegeBlock[1])) {
+                            solfege = solfegeBlock[1][1]?.value || "?";
+                        }
+                    }
+                    
+                    return `Pitch --> Solfege: ${solfege}, Octave: ${octave || "?"}`;
+                    
+                case "solfege":
+                    // Skip showing solfege blocks separately as they're shown in pitch blocks
+                    return null;
+                    
+                case "nameddo":
+                    const actionCalled = blockArgs?.value || "unnamed";
+                    return `Do action --> "${actionCalled}"`;
+                    
+                case "settransposition":
+                    const transpositionValue = getNumericValue(connections[1], blockMap);
+                    return `Set Transposition --> ${transpositionValue || "?"}`;
+                    
+                default:
+                    if (blockArgs?.value !== undefined) {
+                        return `${blockType}: ${blockArgs.value}`;
+                    }
+                    return blockType.charAt(0).toUpperCase() + blockType.slice(1);
+            }
+        }
+
+        // Helper functions
+        function getNumericValue(blockId, blockMap) {
+            if (blockId === null || !blockMap[blockId]) return null;
+            
+            const block = blockMap[blockId];
+            const blockType = Array.isArray(block[1]) ? block[1][0] : block[1];
+            
+            if (blockType === "number") {
+                return Array.isArray(block[1]) ? block[1][1]?.value : block[1];
+            }
+            return null;
+        }
+
+        function getTextValue(blockId, blockMap) {
+            if (blockId === null || !blockMap[blockId]) return null;
+            
+            const block = blockMap[blockId];
+            const blockType = Array.isArray(block[1]) ? block[1][0] : block[1];
+            
+            if (blockType === "text" && Array.isArray(block[1])) {
+                return block[1][1]?.value;
+            }
+            return null;
+        }
+
+        function getDrumName(blockId, blockMap) {
+            if (blockId === null || !blockMap[blockId]) return null;
+            
+            const block = blockMap[blockId];
+            const blockType = Array.isArray(block[1]) ? block[1][0] : block[1];
+            
+            if (blockType === "drumname" && Array.isArray(block[1])) {
+                return block[1][1]?.value;
+            }
+            return null;
+        }
+
+        function getNamedBoxValue(blockId, blockMap) {
+            if (blockId === null || !blockMap[blockId]) return null;
+            
+            const block = blockMap[blockId];
+            const blockType = Array.isArray(block[1]) ? block[1][0] : block[1];
+            
+            if ((blockType === "namedbox" || blockType === "namedarg") && Array.isArray(block[1])) {
+                return block[1][1]?.value;
+            }
+            return null;
+        }
+    </script>
+    <footer style="text-align: center; margin-top: 20px; color: #777;">
+        <p>Created by <a href="https://github.com/omsuneri">Om Santosh Suneri</a></p>
+    </footer> 
+</body>
+</html>
