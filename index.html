@@ -222,8 +222,16 @@
             let blockType = block[1];
             let blockArgs = null;
             if (Array.isArray(blockType)) {
-                blockArgs = blockType[1];
-                blockType = blockType[0];
+               blockArgs = blockType[1];
+               blockType = blockType[0];
+
+               if (blockArgs && typeof blockArgs === 'object') {
+                   for (const key in blockArgs) {
+                       if (typeof blockArgs[key] === 'string' && isBase64Data(blockArgs[key])) {
+                           blockArgs[key] = 'data';
+                       }
+                   }
+               }
             }
 
             if (["vspace", "hidden"].includes(blockType)) {
@@ -517,6 +525,10 @@
                 return block[1][1]?.value;
             }
             return null;
+        }
+        
+        function isBase64Data(str) {
+             return typeof str === 'string' && /^data:(image|audio)\/[a-zA-Z0-9+.-]+;base64,/.test(str);
         }
     </script>
     <footer style="text-align: center; margin-top: 20px; color: #777;">
