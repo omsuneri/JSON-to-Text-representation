@@ -1,4 +1,4 @@
-# Music Blocks JSON to Text Converter
+# Music Blocks JSON to Text Converter 
 
 ## Overview
 This tool converts Music Blocks project files (in JSON format) into simplified, human-readable text representations. Designed specifically to help:
